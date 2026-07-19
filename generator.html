@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>中文写字练习 Chinese Handwriting Practice</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app">
+
+  <header class="topbar">
+    <a href="index.html" class="back-link">← 首页 Home</a>
+    <h1>中文写字练习 <span>Chinese Handwriting Practice Generator</span></h1>
+  </header>
+
+  <div class="layout">
+
+    <aside class="panel">
+
+      <section class="card">
+        <h2>1. 输入文字 Input words</h2>
+        <textarea id="textInput" rows="5" placeholder="每行一个词/字，例如：&#10;该起床了&#10;来不及了&#10;或用空格分开：你好 谢谢"></textarea>
+        <div class="row-actions">
+          <button id="addCharsBtn" class="btn primary">添加 Add</button>
+          <button id="clearAllBtn" class="btn ghost">清空全部 Clear all</button>
+        </div>
+        <p class="hint">每行（或以空格/标点分隔）算一个词，会整体练习；下方字词表会即时跟随输入框内容更新——删掉文字，对应的词也会从列表中消失。 Each line (or space/punctuation-separated run) becomes one practice word. The word list below stays in sync with this box live — delete text here and the matching word disappears from the list too.</p>
+      </section>
+
+      <section class="card">
+        <h2>2. 字词表 Word list</h2>
+        <div id="charTableWrap" class="char-table-wrap">
+          <table id="charTable" class="char-table">
+            <thead>
+              <tr>
+                <th>词/字</th>
+                <th>拼音 Pinyin</th>
+                <th>英文解释 Meaning</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="charTableBody"></tbody>
+          </table>
+          <p id="emptyState" class="empty-state">还没有添加内容。 No words yet — add some above.</p>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>3. 设置 Settings</h2>
+        <div class="settings-grid">
+
+          <label class="field">
+            <span>字体 Script</span>
+            <select id="scriptMode">
+              <option value="simplified">简体 Simplified</option>
+              <option value="traditional">繁體 Traditional</option>
+            </select>
+          </label>
+
+          <label class="field">
+            <span>注音方式 Phonetic</span>
+            <select id="phoneticMode">
+              <option value="pinyin">拼音 Pinyin</option>
+              <option value="zhuyin">注音 Bopomofo</option>
+              <option value="both">两者 Both</option>
+            </select>
+          </label>
+
+          <label class="field">
+            <span>纸张 Page size</span>
+            <select id="pageSize">
+              <option value="a4">A4</option>
+              <option value="letter">Letter</option>
+            </select>
+          </label>
+
+          <label class="field">
+            <span>格子样式 Grid style</span>
+            <select id="gridStyle">
+              <option value="tian">田字格 Tian zi ge</option>
+              <option value="mi">米字格 Mi zi ge</option>
+              <option value="hui">回宫格 Hui gong ge</option>
+              <option value="plain">方格 Plain square</option>
+            </select>
+          </label>
+
+          <label class="field">
+            <span>格子大小 Cell size (mm)</span>
+            <input type="number" id="cellSize" min="12" max="40" step="1" value="20">
+          </label>
+
+          <label class="field">
+            <span>描红深浅 Trace shade</span>
+            <select id="traceStyle">
+              <option value="uniform">统一浅灰 Uniform light</option>
+              <option value="fade">渐变淡出 Fading</option>
+            </select>
+          </label>
+
+          <label class="field">
+            <span>示范字数 Model copies</span>
+            <input type="number" id="repModel" min="0" max="5" step="1" value="0">
+          </label>
+
+          <label class="field">
+            <span>描红字数 Trace copies</span>
+            <input type="number" id="repTrace" min="0" max="16" step="1" value="10">
+          </label>
+
+          <label class="field">
+            <span>练习空格 Blank copies</span>
+            <input type="number" id="repBlank" min="0" max="16" step="1" value="0">
+          </label>
+
+          <label class="field checkbox">
+            <input type="checkbox" id="showMeaning" checked>
+            <span>显示英文解释 Show meaning</span>
+          </label>
+
+          <label class="field checkbox">
+            <input type="checkbox" id="showStrokeOrder">
+            <span>显示笔顺 Show stroke order (single chars)</span>
+          </label>
+
+        </div>
+      </section>
+
+      <section class="card">
+        <button id="generatePdfBtn" class="btn primary big">生成 PDF 下载 Generate &amp; Download PDF</button>
+        <p id="statusMsg" class="hint status"></p>
+      </section>
+
+    </aside>
+
+    <main class="preview-pane">
+      <div id="previewScroll" class="preview-scroll">
+        <div id="pagesContainer"></div>
+      </div>
+    </main>
+
+  </div>
+
+  <footer class="credits">
+    汉字笔画与拼音/释义数据来自 <a href="https://github.com/skishore/makemeahanzi" target="_blank" rel="noopener">Make Me a Hanzi</a>
+    （字典部分基于 Unihan/CJKlib，LGPL v3+；笔画字形基于 Arphic Public License 授权的 Arphic PL KaitiM GB 字体）。
+    简繁转换字表来自 <a href="https://github.com/BYVoid/OpenCC" target="_blank" rel="noopener">OpenCC</a>（Apache-2.0）。
+    Character stroke &amp; dictionary data © Make Me a Hanzi (derived from Unihan/CJKlib, LGPL v3+; Arphic PL KaitiM GB, Arphic Public License).
+    Simplified/Traditional mapping from OpenCC (Apache-2.0).
+  </footer>
+
+</div>
+
+<script src="vendor/hanzi-writer.min.js"></script>
+<script src="vendor/html2canvas.min.js"></script>
+<script src="vendor/jspdf.umd.min.js"></script>
+<script src="bopomofo.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

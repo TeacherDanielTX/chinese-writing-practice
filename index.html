@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>中文写字练习 — Chinese Handwriting Practice Generator</title>
+<meta name="description" content="Turn any Chinese word or character into a printable tracing worksheet — pinyin or zhuyin, simplified or traditional — ready to download as a PDF.">
+<link rel="stylesheet" href="landing.css">
+</head>
+<body>
+
+<header class="hero">
+  <div class="hero-inner">
+    <div class="hero-copy">
+      <h1>中文写字练习<span class="sub">Chinese Handwriting Practice Generator</span></h1>
+      <p class="lede">
+        把任何词语或单字变成可打印的描红练习页 —— 拼音或注音、简体或繁體，可自订英文解释，一键生成 PDF。<br>
+        Turn any Chinese word or character into a printable tracing worksheet — pinyin or zhuyin (bopomofo),
+        simplified or traditional, with editable English meanings — ready to download as a PDF.
+      </p>
+      <a href="generator.html" class="cta">开始制作 Open the Generator →</a>
+      <p class="hero-note">免费使用，无需注册。 Free to use, no sign-up required — runs entirely in your browser.</p>
+    </div>
+    <div class="hero-visual" aria-hidden="true">
+      <div class="mock-cell" style="color:#2a2622;">爱</div>
+      <div class="mock-cell" style="color:rgba(42,38,34,0.45);">爱</div>
+      <div class="mock-cell" style="color:rgba(42,38,34,0.22);">爱</div>
+    </div>
+  </div>
+</header>
+
+<section class="section">
+  <h2>它能做什么 What it does</h2>
+  <p class="section-sub">为孩子、学生或自学者量身定做的中文写字练习页。 Built for kids, students, or anyone practicing Chinese handwriting.</p>
+  <div class="feature-grid">
+    <div class="feature-card">
+      <div class="icon">📝</div>
+      <h3>词语整体练习 Practice whole words</h3>
+      <p>输入词语或短句，字符会整体排列练习，而不是拆散成单字。 Type a word or phrase and it's traced as a unit — not broken into disconnected single characters.</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon">拼</div>
+      <h3>拼音 / 注音 Pinyin or Zhuyin</h3>
+      <p>可切换拼音、注音（ㄅㄆㄇㄈ）或同时显示两者。 Switch between Hanyu Pinyin, Zhuyin/Bopomofo, or show both stacked.</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon">简/繁</div>
+      <h3>简体 / 繁體 Simplified or Traditional</h3>
+      <p>一键切换字体，整份练习页自动转换。 Toggle the script and the whole worksheet converts automatically.</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon">▦</div>
+      <h3>多种格子 田字格 / 米字格 / 回宫格</h3>
+      <p>可调整格子样式、大小、描红深浅，以及示范字和空白练习格的数量。 Choose the guide-grid style, cell size, trace darkness, and how many model/traced/blank repetitions to print.</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon">💬</div>
+      <h3>可自订英文解释 Editable meanings</h3>
+      <p>单字会自动带出英文解释，也可以自己修改或填写。 Single characters auto-fill an English meaning — edit or add your own for any word.</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon">📄</div>
+      <h3>一键 PDF 下载 One-click PDF export</h3>
+      <p>练习页会即时预览，按一下就能生成可打印的 PDF。 The sheet previews live on screen, then downloads as a print-ready PDF.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section steps-section">
+  <h2>使用方法 How it works</h2>
+  <ol class="steps-list">
+    <li>
+      <h3>输入词语 Type your words</h3>
+      <p>每行输入一个词或字。 Type one word or character per line — a phrase like 该起床了 is practiced together.</p>
+    </li>
+    <li>
+      <h3>调整设置 Customize the settings</h3>
+      <p>选择拼音/注音、简体/繁體、格子样式与练习份数。 Pick pinyin/zhuyin, simplified/traditional, grid style, and how many repetitions.</p>
+    </li>
+    <li>
+      <h3>下载 PDF Download the PDF</h3>
+      <p>预览满意后，一键生成并下载。 Once the live preview looks right, generate and download — ready to print.</p>
+    </li>
+  </ol>
+</section>
+
+<div class="bottom-cta">
+  <h2>准备好了吗？ Ready to make a worksheet?</h2>
+  <a href="generator.html" class="cta">开始制作 Open the Generator →</a>
+</div>
+
+<footer class="credits">
+  汉字笔画与拼音/释义数据来自 <a href="https://github.com/skishore/makemeahanzi" target="_blank" rel="noopener">Make Me a Hanzi</a>
+  （字典部分基于 Unihan/CJKlib，LGPL v3+；笔画字形基于 Arphic Public License 授权的 Arphic PL KaitiM GB 字体）。
+  简繁转换字表来自 <a href="https://github.com/BYVoid/OpenCC" target="_blank" rel="noopener">OpenCC</a>（Apache-2.0）。
+  Character stroke &amp; dictionary data © Make Me a Hanzi (derived from Unihan/CJKlib, LGPL v3+; Arphic PL KaitiM GB, Arphic Public License).
+  Simplified/Traditional mapping from OpenCC (Apache-2.0).
+</footer>
+
+</body>
+</html>

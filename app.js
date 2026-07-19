@@ -1,0 +1,582 @@
+(function () {
+  "use strict";
+
+  const MM_PX = 96 / 25.4; // css px per mm at 96dpi
+  const PAGE_MM = {
+    a4: { w: 210, h: 297 },
+    letter: { w: 215.9, h: 279.4 },
+  };
+  const MARGIN_MM = 14;
+  const HEAD_MM = 9;      // pinyin header height above each practice row
+  const LABEL_MM = 6.5;   // entry word+meaning label height
+  const STROKE_MM = 9;    // stroke-order strip height
+  const LINE_GAP_MM = 2.5;
+  const ENTRY_GAP_MM = 5;
+  const BASE = 100;       // fixed internal coordinate space for cached char svg paths
+  const CHAR_RE_RUN = /[㐀-䶿一-鿿豈-﫿]+/g;
+
+  let dict = {};
+  let s2t = {};
+  let t2s = {};
+  const entries = []; // { text, chars:[], pinyins:[], meaning }
+  const strokeCache = new Map(); // ch -> {strokes:[...]} | null
+
+  const els = {
+    textInput: document.getElementById("textInput"),
+    addBtn: document.getElementById("addCharsBtn"),
+    clearBtn: document.getElementById("clearAllBtn"),
+    tableBody: document.getElementById("charTableBody"),
+    emptyState: document.getElementById("emptyState"),
+    scriptMode: document.getElementById("scriptMode"),
+    phoneticMode: document.getElementById("phoneticMode"),
+    pageSize: document.getElementById("pageSize"),
+    gridStyle: document.getElementById("gridStyle"),
+    cellSize: document.getElementById("cellSize"),
+    traceStyle: document.getElementById("traceStyle"),
+    repModel: document.getElementById("repModel"),
+    repTrace: document.getElementById("repTrace"),
+    repBlank: document.getElementById("repBlank"),
+    showMeaning: document.getElementById("showMeaning"),
+    showStrokeOrder: document.getElementById("showStrokeOrder"),
+    generateBtn: document.getElementById("generatePdfBtn"),
+    statusMsg: document.getElementById("statusMsg"),
+    pagesContainer: document.getElementById("pagesContainer"),
+  };
+
+  Promise.all([
+    fetch("data/hanzi-dict.json").then((r) => r.json()).catch(() => ({})),
+    fetch("data/s2t.json").then((r) => r.json()).catch(() => ({})),
+    fetch("data/t2s.json").then((r) => r.json()).catch(() => ({})),
+  ]).then(([d, s2tData, t2sData]) => {
+    dict = d;
+    s2t = s2tData;
+    t2s = t2sData;
+  });
+
+  function getSettings() {
+    return {
+      script: els.scriptMode.value,
+      phonetic: els.phoneticMode.value,
+      pageSize: els.pageSize.value,
+      gridStyle: els.gridStyle.value,
+      cellSizeMM: clampNum(els.cellSize.value, 12, 40, 20),
+      traceStyle: els.traceStyle.value,
+      repModel: clampNum(els.repModel.value, 0, 5, 0),
+      repTrace: clampNum(els.repTrace.value, 0, 16, 10),
+      repBlank: clampNum(els.repBlank.value, 0, 16, 0),
+      showMeaning: els.showMeaning.checked,
+      showStrokeOrder: els.showStrokeOrder.checked,
+    };
+  }
+
+  function clampNum(v, min, max, fallback) {
+    const n = parseFloat(v);
+    if (isNaN(n)) return fallback;
+    return Math.min(max, Math.max(min, n));
+  }
+
+  function convertScript(ch, script) {
+    if (script === "traditional") return s2t[ch] || ch;
+    if (script === "simplified") return t2s[ch] || ch;
+    return ch;
+  }
+
+  function lookupChar(ch) {
+    const e = dict[ch];
+    return {
+      pinyin: e && e.p && e.p.length ? e.p[0] : "",
+      meaning: e && e.d ? e.d : "",
+    };
+  }
+
+  // ---------- word/entry list management ----------
+  // The textarea is the source of truth: its content is parsed into entries
+  // every time it changes, reusing existing entry objects (by word text) so
+  // manual pinyin/meaning edits survive re-syncs. Clearing the textarea (or
+  // deleting a word from it) removes the matching entry from the list.
+
+  function syncEntriesFromTextarea() {
+    const text = els.textInput.value || "";
+    const script = getSettings().script;
+    const lines = text.split(/\n/);
+    const runs = [];
+    lines.forEach((line) => {
+      const m = line.match(CHAR_RE_RUN);
+      if (m) runs.push(...m);
+    });
+
+    const oldByText = new Map(entries.map((e) => [e.text, e]));
+    const seen = new Set();
+    const newEntries = [];
+    runs.forEach((run) => {
+      const chars = Array.from(run).map((ch) => convertScript(ch, script));
+      const convertedText = chars.join("");
+      if (seen.has(convertedText)) return;
+      seen.add(convertedText);
+      const existing = oldByText.get(convertedText);
+      if (existing) {
+        newEntries.push(existing);
+        return;
+      }
+      const pinyins = chars.map((ch) => lookupChar(ch).pinyin);
+      const meaning = chars.length === 1 ? lookupChar(chars[0]).meaning : "";
+      newEntries.push({ text: convertedText, chars, pinyins, meaning });
+    });
+
+    entries.length = 0;
+    entries.push(...newEntries);
+    renderTable();
+    scheduleRender();
+  }
+
+  let syncTimer = null;
+  function scheduleSync() {
+    clearTimeout(syncTimer);
+    syncTimer = setTimeout(syncEntriesFromTextarea, 350);
+  }
+
+  function setTextareaFromEntries() {
+    els.textInput.value = entries.map((e) => e.text).join("\n");
+  }
+
+  function removeEntry(index) {
+    entries.splice(index, 1);
+    setTextareaFromEntries();
+    renderTable();
+    scheduleRender();
+  }
+
+  function clearAll() {
+    entries.length = 0;
+    els.textInput.value = "";
+    renderTable();
+    scheduleRender();
+  }
+
+  function convertAllEntriesScript(script) {
+    entries.forEach((entry) => {
+      const newChars = entry.chars.map((ch) => convertScript(ch, script));
+      entry.chars = newChars;
+      entry.text = newChars.join("");
+      entry.pinyins = newChars.map((ch) => lookupChar(ch).pinyin);
+    });
+    setTextareaFromEntries();
+    renderTable();
+  }
+
+  function renderTable() {
+    els.tableBody.innerHTML = "";
+    els.emptyState.style.display = entries.length ? "none" : "block";
+    entries.forEach((entry, i) => {
+      const tr = document.createElement("tr");
+
+      const tdCh = document.createElement("td");
+      tdCh.className = "ch";
+      tdCh.textContent = entry.text;
+      tr.appendChild(tdCh);
+
+      const tdPinyin = document.createElement("td");
+      const pinyinInput = document.createElement("input");
+      pinyinInput.type = "text";
+      pinyinInput.value = entry.pinyins.join(" ");
+      pinyinInput.addEventListener("input", () => {
+        const toks = pinyinInput.value.trim().split(/\s+/);
+        entry.pinyins = entry.chars.map((_, idx) => toks[idx] || entry.pinyins[idx] || "");
+        scheduleRender();
+      });
+      tdPinyin.appendChild(pinyinInput);
+      tr.appendChild(tdPinyin);
+
+      const tdMeaning = document.createElement("td");
+      const meaningInput = document.createElement("input");
+      meaningInput.type = "text";
+      meaningInput.value = entry.meaning;
+      meaningInput.placeholder = "add meaning...";
+      meaningInput.addEventListener("input", () => {
+        entry.meaning = meaningInput.value;
+        scheduleRender();
+      });
+      tdMeaning.appendChild(meaningInput);
+      tr.appendChild(tdMeaning);
+
+      const tdDel = document.createElement("td");
+      const delBtn = document.createElement("button");
+      delBtn.className = "del-btn";
+      delBtn.textContent = "✕";
+      delBtn.title = "Remove";
+      delBtn.addEventListener("click", () => removeEntry(i));
+      tdDel.appendChild(delBtn);
+      tr.appendChild(tdDel);
+
+      els.tableBody.appendChild(tr);
+    });
+  }
+
+  // ---------- grid background (CSS data-uri) ----------
+
+  const gridUriCache = new Map();
+
+  function gridBackgroundUri(style) {
+    if (gridUriCache.has(style)) return gridUriCache.get(style);
+    const s = 100;
+    const stroke = "#c9c0b0";
+    const border = "#9b9182";
+    let inner = "";
+    if (style === "tian") {
+      inner =
+        `<line x1="${s/2}" y1="0" x2="${s/2}" y2="${s}" stroke="${stroke}" stroke-width="1" stroke-dasharray="4,3"/>` +
+        `<line x1="0" y1="${s/2}" x2="${s}" y2="${s/2}" stroke="${stroke}" stroke-width="1" stroke-dasharray="4,3"/>`;
+    } else if (style === "mi") {
+      inner =
+        `<line x1="${s/2}" y1="0" x2="${s/2}" y2="${s}" stroke="${stroke}" stroke-width="1" stroke-dasharray="4,3"/>` +
+        `<line x1="0" y1="${s/2}" x2="${s}" y2="${s/2}" stroke="${stroke}" stroke-width="1" stroke-dasharray="4,3"/>` +
+        `<line x1="0" y1="0" x2="${s}" y2="${s}" stroke="${stroke}" stroke-width="1" stroke-dasharray="4,3"/>` +
+        `<line x1="${s}" y1="0" x2="0" y2="${s}" stroke="${stroke}" stroke-width="1" stroke-dasharray="4,3"/>`;
+    } else if (style === "hui") {
+      const inset = s * 0.24;
+      inner =
+        `<rect x="${inset}" y="${inset}" width="${s-2*inset}" height="${s-2*inset}" fill="none" stroke="${stroke}" stroke-width="1" stroke-dasharray="4,3"/>` +
+        `<line x1="${s/2}" y1="0" x2="${s/2}" y2="${s}" stroke="${stroke}" stroke-width="1" stroke-dasharray="4,3"/>` +
+        `<line x1="0" y1="${s/2}" x2="${s}" y2="${s/2}" stroke="${stroke}" stroke-width="1" stroke-dasharray="4,3"/>`;
+    }
+    const svg =
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${s} ${s}">` +
+      `<rect x="0.5" y="0.5" width="${s-1}" height="${s-1}" fill="#fffdf9" stroke="${border}" stroke-width="1.4"/>` +
+      inner +
+      `</svg>`;
+    const uri = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svg)));
+    gridUriCache.set(style, uri);
+    return uri;
+  }
+
+  // ---------- character stroke data (cached per char) ----------
+
+  async function ensureStrokeData(chars) {
+    const toLoad = chars.filter((ch) => !strokeCache.has(ch));
+    await Promise.all(
+      toLoad.map((ch) =>
+        HanziWriter.loadCharacterData(ch)
+          .then((data) => strokeCache.set(ch, data))
+          .catch(() => strokeCache.set(ch, null))
+      )
+    );
+  }
+
+  const charSvgInnerCache = new Map(); // ch -> inner <g> markup string, or null
+
+  function getCharSvgInner(ch) {
+    if (charSvgInnerCache.has(ch)) return charSvgInnerCache.get(ch);
+    const data = strokeCache.get(ch);
+    let inner = null;
+    if (data && data.strokes && data.strokes.length) {
+      const padding = BASE * 0.12;
+      const t = HanziWriter.getScalingTransform(BASE, BASE, padding);
+      const paths = data.strokes.map((d) => `<path d="${d}" fill="#1c1a17"/>`).join("");
+      inner = `<g transform="${t.transform}">${paths}</g>`;
+    }
+    charSvgInnerCache.set(ch, inner);
+    return inner;
+  }
+
+  function buildCellSvg(ch, opacity) {
+    const inner = getCharSvgInner(ch);
+    if (!inner) return "";
+    return `<svg viewBox="0 0 ${BASE} ${BASE}" style="opacity:${opacity}">${inner}</svg>`;
+  }
+
+  function buildStrokeOrderGlyphs(ch) {
+    const data = strokeCache.get(ch);
+    if (!data || !data.strokes || !data.strokes.length) return [];
+    const padding = BASE * 0.12;
+    const t = HanziWriter.getScalingTransform(BASE, BASE, padding);
+    const glyphs = [];
+    for (let i = 0; i < data.strokes.length; i++) {
+      const paths = data.strokes.slice(0, i + 1).map((d) => `<path d="${d}" fill="#333"/>`).join("");
+      glyphs.push(`<svg viewBox="0 0 ${BASE} ${BASE}"><g transform="${t.transform}">${paths}</g></svg>`);
+    }
+    return glyphs;
+  }
+
+  // ---------- slot plan ----------
+
+  function buildSlots(settings) {
+    const slots = [];
+    for (let i = 0; i < settings.repModel; i++) slots.push({ opacity: 1 });
+    const n = settings.repTrace;
+    if (settings.traceStyle === "fade") {
+      for (let i = 0; i < n; i++) {
+        const t = n <= 1 ? 0.5 : i / (n - 1);
+        slots.push({ opacity: Math.max(0.12, 0.55 - t * 0.4) });
+      }
+    } else {
+      for (let i = 0; i < n; i++) slots.push({ opacity: 0.32 });
+    }
+    for (let i = 0; i < settings.repBlank; i++) slots.push({ opacity: 0, blank: true });
+    if (slots.length === 0) slots.push({ opacity: 0, blank: true });
+    return slots;
+  }
+
+  // ---------- phonetic label per character ----------
+
+  function phoneticLabel(pinyin, phonetic) {
+    if (!pinyin) return { main: "", sub: "" };
+    if (phonetic === "zhuyin") return { main: Bopomofo.pinyinToZhuyin(pinyin), sub: "" };
+    if (phonetic === "both") return { main: pinyin, sub: Bopomofo.pinyinToZhuyin(pinyin) };
+    return { main: pinyin, sub: "" };
+  }
+
+  // ---------- render preview (paginated) ----------
+
+  let renderToken = 0;
+
+  function scheduleRender() {
+    const myToken = ++renderToken;
+    clearTimeout(scheduleRender._t);
+    scheduleRender._t = setTimeout(() => {
+      if (myToken !== renderToken) return;
+      renderAll().catch((e) => console.error(e));
+    }, 180);
+  }
+
+  async function renderAll() {
+    const settings = getSettings();
+    els.generateBtn.disabled = entries.length === 0;
+
+    if (entries.length === 0) {
+      els.pagesContainer.innerHTML = '<p class="empty-preview">添加词/字后将在此显示练习页预览。<br>Add words above to preview the practice sheet.</p>';
+      return;
+    }
+
+    const allChars = new Set();
+    entries.forEach((e) => e.chars.forEach((c) => allChars.add(c)));
+    await ensureStrokeData(Array.from(allChars));
+
+    const page = PAGE_MM[settings.pageSize];
+    const pageWpx = page.w * MM_PX;
+    const pageHpx = page.h * MM_PX;
+    const marginPx = MARGIN_MM * MM_PX;
+    const contentWmm = page.w - 2 * MARGIN_MM;
+    const contentHmm = page.h - 2 * MARGIN_MM;
+    const contentWpx = contentWmm * MM_PX;
+    const contentHpx = contentHmm * MM_PX;
+    const cellMM = settings.cellSizeMM;
+    const cellPx = cellMM * MM_PX;
+    const headPx = HEAD_MM * MM_PX;
+    const labelPx = LABEL_MM * MM_PX;
+    const strokePx = STROKE_MM * MM_PX;
+    const lineGapPx = LINE_GAP_MM * MM_PX;
+    const entryGapPx = ENTRY_GAP_MM * MM_PX;
+
+    const slots = buildSlots(settings);
+    const gridUri = gridBackgroundUri(settings.gridStyle);
+
+    // pre-compute per-entry layout metrics
+    const layouts = entries.map((entry) => {
+      const numChars = entry.chars.length;
+      const unitWidthPx = numChars * cellPx;
+      const columnsPerLine = Math.max(1, Math.floor(contentWpx / unitWidthPx));
+      const linesNeeded = Math.max(1, Math.ceil(slots.length / columnsPerLine));
+      const hasStrokeOrder = settings.showStrokeOrder && numChars === 1 && strokeCache.get(entry.chars[0]);
+      let heightPx = settings.showMeaning ? labelPx : 0;
+      if (hasStrokeOrder) heightPx += strokePx;
+      heightPx += linesNeeded * headPx + linesNeeded * cellPx + (linesNeeded - 1) * lineGapPx;
+      heightPx += entryGapPx;
+      return { entry, numChars, unitWidthPx, columnsPerLine, linesNeeded, hasStrokeOrder, heightPx };
+    });
+
+    // bucket into pages
+    const pages = [[]];
+    let curHeight = 0;
+    layouts.forEach((layout) => {
+      if (curHeight + layout.heightPx > contentHpx && pages[pages.length - 1].length > 0) {
+        pages.push([]);
+        curHeight = 0;
+      }
+      pages[pages.length - 1].push(layout);
+      curHeight += layout.heightPx;
+    });
+
+    els.pagesContainer.innerHTML = "";
+
+    pages.forEach((pageLayouts) => {
+      const pageDiv = document.createElement("div");
+      pageDiv.className = "pdf-page";
+      pageDiv.style.width = pageWpx + "px";
+      pageDiv.style.height = pageHpx + "px";
+
+      const inner = document.createElement("div");
+      inner.className = "page-inner";
+      inner.style.left = marginPx + "px";
+      inner.style.top = marginPx + "px";
+      inner.style.width = contentWpx + "px";
+      inner.style.height = contentHpx + "px";
+      inner.style.gap = entryGapPx + "px";
+
+      pageLayouts.forEach((layout) => {
+        const { entry, numChars, unitWidthPx, columnsPerLine } = layout;
+        const block = document.createElement("div");
+        block.className = "entry-block";
+
+        if (settings.showMeaning) {
+          const label = document.createElement("div");
+          label.className = "entry-label";
+          label.style.height = labelPx + "px";
+          label.style.fontSize = Math.round(cellPx * 0.2) + "px";
+          const word = document.createElement("span");
+          word.className = "word";
+          word.textContent = entry.text;
+          label.appendChild(word);
+          if (entry.meaning) {
+            const meaning = document.createElement("span");
+            meaning.className = "meaning";
+            meaning.style.fontSize = Math.round(cellPx * 0.15) + "px";
+            meaning.textContent = entry.meaning;
+            label.appendChild(meaning);
+          }
+          block.appendChild(label);
+        }
+
+        if (layout.hasStrokeOrder) {
+          const glyphs = buildStrokeOrderGlyphs(entry.chars[0]);
+          if (glyphs.length) {
+            const row = document.createElement("div");
+            row.className = "stroke-order-row";
+            row.style.height = strokePx + "px";
+            row.style.gap = "3px";
+            const glyphSize = Math.min(cellPx * 0.42, 30);
+            glyphs.forEach((svg, gi) => {
+              const g = document.createElement("div");
+              g.className = "stroke-glyph";
+              g.style.width = glyphSize + "px";
+              g.style.height = glyphSize + "px";
+              g.innerHTML = svg;
+              row.appendChild(g);
+              if (gi < glyphs.length - 1) {
+                const arrow = document.createElement("span");
+                arrow.className = "arrow";
+                arrow.textContent = "›";
+                arrow.style.fontSize = Math.round(glyphSize * 0.6) + "px";
+                row.appendChild(arrow);
+              }
+            });
+            block.appendChild(row);
+          }
+        }
+
+        const unitWrap = document.createElement("div");
+        unitWrap.className = "unit-wrap";
+        unitWrap.style.width = (columnsPerLine * unitWidthPx) + "px";
+        unitWrap.style.gap = lineGapPx + "px";
+
+        slots.forEach((slot) => {
+          const unit = document.createElement("div");
+          unit.className = "unit";
+          unit.style.width = unitWidthPx + "px";
+
+          const head = document.createElement("div");
+          head.className = "unit-head";
+          head.style.height = headPx + "px";
+
+          const row = document.createElement("div");
+          row.className = "unit-row";
+
+          entry.chars.forEach((ch, ci) => {
+            const syllSpan = document.createElement("div");
+            syllSpan.className = "syll";
+            syllSpan.style.width = cellPx + "px";
+            syllSpan.style.fontSize = Math.round(cellPx * 0.22) + "px";
+            const lbl = phoneticLabel(entry.pinyins[ci], settings.phonetic);
+            if (lbl.sub) {
+              syllSpan.innerHTML = `${escapeHtml(lbl.main)}<span class="zy" style="font-size:${Math.round(cellPx*0.16)}px">${escapeHtml(lbl.sub)}</span>`;
+            } else {
+              syllSpan.textContent = lbl.main;
+            }
+            head.appendChild(syllSpan);
+
+            const cell = document.createElement("div");
+            cell.className = "cell";
+            cell.style.width = cellPx + "px";
+            cell.style.height = cellPx + "px";
+            cell.style.backgroundImage = `url("${gridUri}")`;
+            if (!slot.blank) cell.innerHTML = buildCellSvg(ch, slot.opacity);
+            row.appendChild(cell);
+          });
+
+          unit.appendChild(head);
+          unit.appendChild(row);
+          unitWrap.appendChild(unit);
+        });
+
+        block.appendChild(unitWrap);
+        inner.appendChild(block);
+      });
+
+      pageDiv.appendChild(inner);
+      els.pagesContainer.appendChild(pageDiv);
+    });
+  }
+
+  function escapeHtml(s) {
+    return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
+
+  // ---------- PDF export ----------
+
+  async function generatePdf() {
+    if (entries.length === 0) return;
+    els.generateBtn.disabled = true;
+    els.statusMsg.textContent = "生成中... Generating PDF, please wait...";
+
+    try {
+      await renderAll();
+      const pageEls = Array.from(els.pagesContainer.querySelectorAll(".pdf-page"));
+      if (pageEls.length === 0) throw new Error("no pages");
+
+      const settings = getSettings();
+      const page = PAGE_MM[settings.pageSize];
+      const pageWpx = page.w * MM_PX;
+      const pageHpx = page.h * MM_PX;
+
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF({ unit: "px", format: [pageWpx, pageHpx], compress: true });
+
+      for (let i = 0; i < pageEls.length; i++) {
+        els.statusMsg.textContent = `渲染第 ${i + 1}/${pageEls.length} 页... Rendering page ${i + 1}/${pageEls.length}...`;
+        const canvas = await html2canvas(pageEls[i], { scale: 2, backgroundColor: "#ffffff", useCORS: true });
+        const imgData = canvas.toDataURL("image/jpeg", 0.92);
+        if (i > 0) pdf.addPage([pageWpx, pageHpx], "portrait");
+        pdf.addImage(imgData, "JPEG", 0, 0, pageWpx, pageHpx);
+      }
+
+      pdf.save("chinese-handwriting-practice.pdf");
+      els.statusMsg.textContent = "完成！已下载 PDF。 Done — PDF downloaded.";
+    } catch (err) {
+      console.error(err);
+      els.statusMsg.textContent = "出错了，请重试。 Something went wrong, please try again.";
+    } finally {
+      els.generateBtn.disabled = entries.length === 0;
+      setTimeout(() => { els.statusMsg.textContent = ""; }, 4000);
+    }
+  }
+
+  // ---------- wiring ----------
+
+  els.addBtn.addEventListener("click", syncEntriesFromTextarea);
+  els.textInput.addEventListener("input", scheduleSync);
+  els.textInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) syncEntriesFromTextarea();
+  });
+  els.clearBtn.addEventListener("click", clearAll);
+  els.generateBtn.addEventListener("click", generatePdf);
+
+  els.scriptMode.addEventListener("change", () => {
+    convertAllEntriesScript(els.scriptMode.value);
+    scheduleRender();
+  });
+
+  [els.phoneticMode, els.pageSize, els.gridStyle, els.cellSize, els.traceStyle, els.repModel, els.repTrace, els.repBlank, els.showMeaning, els.showStrokeOrder]
+    .forEach((el) => el.addEventListener("input", scheduleRender));
+
+  renderTable();
+  scheduleRender();
+})();

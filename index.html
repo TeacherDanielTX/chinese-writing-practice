@@ -66,6 +66,47 @@
   </div>
 </section>
 
+<section class="section">
+  <h2>实际范例 See it in action</h2>
+  <p class="section-sub">以下都是用真实笔画数据即时生成的范例，不是截图。 These are rendered live with real stroke data — not screenshots.</p>
+  <div class="showcase-grid">
+
+    <div class="showcase-card">
+      <h3>词语整体练习 Whole-word practice</h3>
+      <p class="showcase-sub">该起床了 (gāi qǐ chuáng le) — 4 characters traced together as one phrase.</p>
+      <div id="showcase-word" class="showcase-demo"></div>
+    </div>
+
+    <div class="showcase-card">
+      <h3>拼音 + 注音 Pinyin + Zhuyin</h3>
+      <p class="showcase-sub">你好 (nǐ hǎo) — both shown stacked, on a 米字格 grid.</p>
+      <div id="showcase-phonetic" class="showcase-demo"></div>
+    </div>
+
+    <div class="showcase-card">
+      <h3>简体 / 繁體 Simplified / Traditional</h3>
+      <p class="showcase-sub">同一个字，一键切换字体。 Same word, one click to switch script.</p>
+      <div class="showcase-demo showcase-script-pair">
+        <div class="pair-item">
+          <div id="showcase-script-simp"></div>
+          <div class="pair-label">简体 Simplified</div>
+        </div>
+        <div class="pair-item">
+          <div id="showcase-script-trad"></div>
+          <div class="pair-label">繁體 Traditional</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="showcase-card">
+      <h3>笔顺 Stroke order</h3>
+      <p class="showcase-sub">送 (sòng) — optional stroke-by-stroke build-up diagram.</p>
+      <div id="showcase-stroke" class="showcase-demo"></div>
+    </div>
+
+  </div>
+</section>
+
 <section class="section steps-section">
   <h2>使用方法 How it works</h2>
   <ol class="steps-list">
@@ -97,5 +138,8 @@
   Simplified/Traditional mapping from OpenCC (Apache-2.0).
 </footer>
 
+<script src="vendor/hanzi-writer.min.js"></script>
+<script src="bopomofo.js"></script>
+<script src="showcase.js"></script>
 </body>
 </html>

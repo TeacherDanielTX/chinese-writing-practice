@@ -199,6 +199,114 @@ a { color: var(--accent-dark); }
   margin: 0 0 18px;
 }
 
+/* ---- showcase (live-rendered examples using real stroke data) ---- */
+
+.showcase-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 20px;
+}
+.showcase-card {
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 18px;
+  overflow-x: auto;
+}
+.showcase-card h3 {
+  margin: 0 0 4px;
+  font-size: 15px;
+}
+.showcase-card .showcase-sub {
+  margin: 0 0 14px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.showcase-demo {
+  min-height: 90px;
+  display: flex;
+  align-items: center;
+}
+.showcase-script-pair {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+}
+.showcase-script-pair .pair-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.showcase-script-pair .pair-label {
+  font-size: 11.5px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.unit-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.unit {
+  display: flex;
+  flex-direction: column;
+}
+.unit-head {
+  display: flex;
+}
+.unit-head .syll {
+  text-align: center;
+  overflow: hidden;
+  white-space: nowrap;
+  color: var(--accent-dark);
+  font-family: Georgia, "Times New Roman", serif;
+  line-height: 1.15;
+}
+.unit-head .syll .zy {
+  display: block;
+  font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+  color: #888;
+}
+.unit-row {
+  display: flex;
+}
+.cell {
+  position: relative;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 100% 100%;
+  box-sizing: border-box;
+}
+.cell svg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.stroke-order-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px;
+}
+.stroke-order-row .stroke-glyph {
+  position: relative;
+  flex-shrink: 0;
+}
+.stroke-order-row .stroke-glyph svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.stroke-order-row .arrow {
+  color: #bbb;
+  flex-shrink: 0;
+}
+
 .credits {
   font-size: 10.5px;
   color: var(--muted);

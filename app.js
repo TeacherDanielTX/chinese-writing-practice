@@ -274,18 +274,28 @@
 
   // Narrow ruled box for zhuyin, placed to the right of the character (as in
   // Taiwanese 生字簿 practice books), with a center guide for the vertical stack.
+  // The SVG's viewBox aspect ratio must match the box's actual aspect ratio
+  // (width:height = widthFactor:1) — otherwise background-size:100% 100%
+  // stretches it non-uniformly and the border becomes a sub-pixel hairline
+  // on the narrow sides.
   let zhuyinBoxUriCache = null;
-  function zhuyinBoxUri() {
-    if (zhuyinBoxUriCache) return zhuyinBoxUriCache;
-    const s = 100;
+  let zhuyinBoxUriCacheFactor = null;
+  function zhuyinBoxUri(widthFactor) {
+    if (zhuyinBoxUriCache && zhuyinBoxUriCacheFactor === widthFactor) return zhuyinBoxUriCache;
+    const w = 100;
+    const h = w / widthFactor;
+    const scale = 1 / widthFactor;
     const border = "#9b9182";
     const guide = "#c9c0b0";
+    const strokeW = 1.4 * scale;
+    const guideW = 1 * scale;
     const svg =
-      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${s} ${s}">` +
-      `<rect x="0.5" y="0.5" width="${s-1}" height="${s-1}" fill="#fffdf9" stroke="${border}" stroke-width="1.4"/>` +
-      `<line x1="${s/2}" y1="0" x2="${s/2}" y2="${s}" stroke="${guide}" stroke-width="1" stroke-dasharray="4,3"/>` +
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}">` +
+      `<rect x="${strokeW/2}" y="${strokeW/2}" width="${w-strokeW}" height="${h-strokeW}" fill="#fffdf9" stroke="${border}" stroke-width="${strokeW}"/>` +
+      `<line x1="${w/2}" y1="0" x2="${w/2}" y2="${h}" stroke="${guide}" stroke-width="${guideW}" stroke-dasharray="${4*scale},${3*scale}"/>` +
       `</svg>`;
     zhuyinBoxUriCache = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svg)));
+    zhuyinBoxUriCacheFactor = widthFactor;
     return zhuyinBoxUriCache;
   }
 
@@ -406,7 +416,7 @@
     const slots = buildSlots(settings);
     const gridUri = gridBackgroundUri(settings.gridStyle);
     const pyGridUri = pinyinGridUri();
-    const zyBoxUri = zhuyinBoxUri();
+    const zyBoxUri = zhuyinBoxUri(ZHUYIN_WIDTH_FACTOR);
 
     // pre-compute per-entry layout metrics
     const layouts = entries.map((entry) => {

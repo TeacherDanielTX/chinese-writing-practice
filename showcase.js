@@ -46,14 +46,18 @@
     return "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svg)));
   }
 
-  function zhuyinBoxUri() {
-    const s = 100;
+  function zhuyinBoxUri(widthFactor) {
+    const w = 100;
+    const h = w / widthFactor;
+    const scale = 1 / widthFactor;
     const border = "#9b9182";
     const guide = "#c9c0b0";
+    const strokeW = 1.4 * scale;
+    const guideW = 1 * scale;
     const svg =
-      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${s} ${s}">` +
-      `<rect x="0.5" y="0.5" width="${s-1}" height="${s-1}" fill="#fffdf9" stroke="${border}" stroke-width="1.4"/>` +
-      `<line x1="${s/2}" y1="0" x2="${s/2}" y2="${s}" stroke="${guide}" stroke-width="1" stroke-dasharray="4,3"/>` +
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}">` +
+      `<rect x="${strokeW/2}" y="${strokeW/2}" width="${w-strokeW}" height="${h-strokeW}" fill="#fffdf9" stroke="${border}" stroke-width="${strokeW}"/>` +
+      `<line x1="${w/2}" y1="0" x2="${w/2}" y2="${h}" stroke="${guide}" stroke-width="${guideW}" stroke-dasharray="${4*scale},${3*scale}"/>` +
       `</svg>`;
     return "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svg)));
   }
@@ -95,7 +99,7 @@
     const { reps = 3, gridStyle = "tian", phonetic = "pinyin" } = opts || {};
     const gridUri = gridBackgroundUri(gridStyle);
     const pyGridUri = pinyinGridUri();
-    const zyBoxUri = zhuyinBoxUri();
+    const zyBoxUri = zhuyinBoxUri(1 / 3);
     const showPinyinGrid = phonetic === "pinyin" || phonetic === "both";
     const showZhuyinBox = phonetic === "zhuyin" || phonetic === "both";
     const pinyinGridPx = 26;

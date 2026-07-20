@@ -32,6 +32,32 @@
     return "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svg)));
   }
 
+  function pinyinGridUri() {
+    const w = 100, h = 44;
+    const border = "#9b9182";
+    const guide = "#c9c0b0";
+    const y2 = h * 0.32, y3 = h * 0.68;
+    const svg =
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}">` +
+      `<rect x="0.5" y="0.5" width="${w-1}" height="${h-1}" fill="#fffdf9" stroke="${border}" stroke-width="1.4"/>` +
+      `<line x1="0" y1="${y2}" x2="${w}" y2="${y2}" stroke="${guide}" stroke-width="1" stroke-dasharray="4,3"/>` +
+      `<line x1="0" y1="${y3}" x2="${w}" y2="${y3}" stroke="${guide}" stroke-width="1" stroke-dasharray="4,3"/>` +
+      `</svg>`;
+    return "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svg)));
+  }
+
+  function zhuyinBoxUri() {
+    const s = 100;
+    const border = "#9b9182";
+    const guide = "#c9c0b0";
+    const svg =
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${s} ${s}">` +
+      `<rect x="0.5" y="0.5" width="${s-1}" height="${s-1}" fill="#fffdf9" stroke="${border}" stroke-width="1.4"/>` +
+      `<line x1="${s/2}" y1="0" x2="${s/2}" y2="${s}" stroke="${guide}" stroke-width="1" stroke-dasharray="4,3"/>` +
+      `</svg>`;
+    return "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svg)));
+  }
+
   async function ensureStrokeData(chars) {
     const toLoad = chars.filter((ch) => !strokeCache.has(ch));
     await Promise.all(
@@ -68,46 +94,73 @@
   function buildWordRow(container, chars, pinyins, opts) {
     const { reps = 3, gridStyle = "tian", phonetic = "pinyin" } = opts || {};
     const gridUri = gridBackgroundUri(gridStyle);
+    const pyGridUri = pinyinGridUri();
+    const zyBoxUri = zhuyinBoxUri();
+    const showPinyinGrid = phonetic === "pinyin" || phonetic === "both";
+    const showZhuyinBox = phonetic === "zhuyin" || phonetic === "both";
+    const pinyinGridPx = 26;
+    const zhuyinPx = CELL_PX / 3; // 1/3 the character cell's width, same height as the cell
+    const charColWidthPx = CELL_PX + (showZhuyinBox ? zhuyinPx : 0);
+
     const unitWrap = document.createElement("div");
     unitWrap.className = "unit-wrap";
     for (let r = 0; r < reps; r++) {
+      const opacity = r === 0 ? 1 : 0.32;
       const unit = document.createElement("div");
       unit.className = "unit";
-      unit.style.width = (chars.length * CELL_PX) + "px";
-
-      const head = document.createElement("div");
-      head.className = "unit-head";
-      head.style.height = "30px";
+      unit.style.width = (chars.length * charColWidthPx) + "px";
 
       const row = document.createElement("div");
       row.className = "unit-row";
 
       chars.forEach((ch, ci) => {
-        const syll = document.createElement("div");
-        syll.className = "syll";
-        syll.style.width = CELL_PX + "px";
-        syll.style.fontSize = "13px";
+        const col = document.createElement("div");
+        col.className = "char-col";
+        col.style.width = charColWidthPx + "px";
         const py = pinyins[ci];
-        const zy = phonetic !== "pinyin" ? Bopomofo.pinyinToZhuyin(py) : "";
-        if (phonetic === "both") {
-          syll.innerHTML = `${py}<span class="zy" style="font-size:10px">${zy}</span>`;
-        } else if (phonetic === "zhuyin") {
-          syll.textContent = zy;
-        } else {
-          syll.textContent = py;
+
+        if (showPinyinGrid) {
+          const pyCell = document.createElement("div");
+          pyCell.className = "pinyin-cell";
+          pyCell.style.width = CELL_PX + "px";
+          pyCell.style.height = pinyinGridPx + "px";
+          pyCell.style.backgroundImage = `url("${pyGridUri}")`;
+          pyCell.style.opacity = opacity;
+          pyCell.style.fontSize = "12px";
+          pyCell.textContent = py;
+          col.appendChild(pyCell);
         }
-        head.appendChild(syll);
+
+        const charZy = document.createElement("div");
+        charZy.className = "char-zhuyin-row";
 
         const cell = document.createElement("div");
         cell.className = "cell";
         cell.style.width = CELL_PX + "px";
         cell.style.height = CELL_PX + "px";
         cell.style.backgroundImage = `url("${gridUri}")`;
-        cell.innerHTML = charSvg(ch, r === 0 ? 1 : 0.32);
-        row.appendChild(cell);
+        cell.innerHTML = charSvg(ch, opacity);
+        charZy.appendChild(cell);
+
+        if (showZhuyinBox) {
+          const zyCell = document.createElement("div");
+          zyCell.className = "zhuyin-cell";
+          zyCell.style.width = zhuyinPx + "px";
+          zyCell.style.height = CELL_PX + "px";
+          zyCell.style.backgroundImage = `url("${zyBoxUri}")`;
+          zyCell.style.opacity = opacity;
+          const zy = document.createElement("span");
+          zy.className = "zy-vert";
+          zy.style.fontSize = Math.round(CELL_PX * 0.2) + "px";
+          zy.textContent = Bopomofo.pinyinToZhuyin(py);
+          zyCell.appendChild(zy);
+          charZy.appendChild(zyCell);
+        }
+
+        col.appendChild(charZy);
+        row.appendChild(col);
       });
 
-      unit.appendChild(head);
       unit.appendChild(row);
       unitWrap.appendChild(unit);
     }

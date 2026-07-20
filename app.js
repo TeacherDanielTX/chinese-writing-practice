@@ -7,7 +7,8 @@
     letter: { w: 215.9, h: 279.4 },
   };
   const MARGIN_MM = 14;
-  const HEAD_MM = 9;      // pinyin header height above each practice row
+  const PINYIN_GRID_MM = 8;    // ruled four-line pinyin box height, above the character
+  const ZHUYIN_WIDTH_FACTOR = 1 / 3; // zhuyin box width, as a fraction of the character cell (height matches the character cell)
   const LABEL_MM = 6.5;   // entry word+meaning label height
   const STROKE_MM = 9;    // stroke-order strip height
   const LINE_GAP_MM = 2.5;
@@ -249,6 +250,45 @@
     return uri;
   }
 
+  // Ruled "four-line-three-row" (四线三格) box used for pinyin, matching how
+  // Chinese pinyin is taught to be written: a shorter top band (ascenders/tone
+  // marks), a taller middle band (main letter body), and a shorter bottom
+  // band (descenders).
+  let pinyinGridUriCache = null;
+  function pinyinGridUri() {
+    if (pinyinGridUriCache) return pinyinGridUriCache;
+    const w = 100, h = 44;
+    const border = "#9b9182";
+    const guide = "#c9c0b0";
+    const y2 = h * 0.32;
+    const y3 = h * 0.68;
+    const svg =
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}">` +
+      `<rect x="0.5" y="0.5" width="${w-1}" height="${h-1}" fill="#fffdf9" stroke="${border}" stroke-width="1.4"/>` +
+      `<line x1="0" y1="${y2}" x2="${w}" y2="${y2}" stroke="${guide}" stroke-width="1" stroke-dasharray="4,3"/>` +
+      `<line x1="0" y1="${y3}" x2="${w}" y2="${y3}" stroke="${guide}" stroke-width="1" stroke-dasharray="4,3"/>` +
+      `</svg>`;
+    pinyinGridUriCache = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svg)));
+    return pinyinGridUriCache;
+  }
+
+  // Narrow ruled box for zhuyin, placed to the right of the character (as in
+  // Taiwanese 生字簿 practice books), with a center guide for the vertical stack.
+  let zhuyinBoxUriCache = null;
+  function zhuyinBoxUri() {
+    if (zhuyinBoxUriCache) return zhuyinBoxUriCache;
+    const s = 100;
+    const border = "#9b9182";
+    const guide = "#c9c0b0";
+    const svg =
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${s} ${s}">` +
+      `<rect x="0.5" y="0.5" width="${s-1}" height="${s-1}" fill="#fffdf9" stroke="${border}" stroke-width="1.4"/>` +
+      `<line x1="${s/2}" y1="0" x2="${s/2}" y2="${s}" stroke="${guide}" stroke-width="1" stroke-dasharray="4,3"/>` +
+      `</svg>`;
+    zhuyinBoxUriCache = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svg)));
+    return zhuyinBoxUriCache;
+  }
+
   // ---------- character stroke data (cached per char) ----------
 
   async function ensureStrokeData(chars) {
@@ -316,15 +356,6 @@
     return slots;
   }
 
-  // ---------- phonetic label per character ----------
-
-  function phoneticLabel(pinyin, phonetic) {
-    if (!pinyin) return { main: "", sub: "" };
-    if (phonetic === "zhuyin") return { main: Bopomofo.pinyinToZhuyin(pinyin), sub: "" };
-    if (phonetic === "both") return { main: pinyin, sub: Bopomofo.pinyinToZhuyin(pinyin) };
-    return { main: pinyin, sub: "" };
-  }
-
   // ---------- render preview (paginated) ----------
 
   let renderToken = 0;
@@ -361,7 +392,12 @@
     const contentHpx = contentHmm * MM_PX;
     const cellMM = settings.cellSizeMM;
     const cellPx = cellMM * MM_PX;
-    const headPx = HEAD_MM * MM_PX;
+    const showPinyinGrid = settings.phonetic === "pinyin" || settings.phonetic === "both";
+    const showZhuyinBox = settings.phonetic === "zhuyin" || settings.phonetic === "both";
+    const pinyinGridPx = PINYIN_GRID_MM * MM_PX;
+    const zhuyinPx = cellPx * ZHUYIN_WIDTH_FACTOR; // 1/3 the character cell's width, same height as the cell
+    const charColWidthPx = cellPx + (showZhuyinBox ? zhuyinPx : 0);
+    const lineHeightPx = (showPinyinGrid ? pinyinGridPx : 0) + cellPx;
     const labelPx = LABEL_MM * MM_PX;
     const strokePx = STROKE_MM * MM_PX;
     const lineGapPx = LINE_GAP_MM * MM_PX;
@@ -369,17 +405,19 @@
 
     const slots = buildSlots(settings);
     const gridUri = gridBackgroundUri(settings.gridStyle);
+    const pyGridUri = pinyinGridUri();
+    const zyBoxUri = zhuyinBoxUri();
 
     // pre-compute per-entry layout metrics
     const layouts = entries.map((entry) => {
       const numChars = entry.chars.length;
-      const unitWidthPx = numChars * cellPx;
+      const unitWidthPx = numChars * charColWidthPx;
       const columnsPerLine = Math.max(1, Math.floor(contentWpx / unitWidthPx));
       const linesNeeded = Math.max(1, Math.ceil(slots.length / columnsPerLine));
       const hasStrokeOrder = settings.showStrokeOrder && numChars === 1 && strokeCache.get(entry.chars[0]);
       let heightPx = settings.showMeaning ? labelPx : 0;
       if (hasStrokeOrder) heightPx += strokePx;
-      heightPx += linesNeeded * headPx + linesNeeded * cellPx + (linesNeeded - 1) * lineGapPx;
+      heightPx += linesNeeded * lineHeightPx + (linesNeeded - 1) * lineGapPx;
       heightPx += entryGapPx;
       return { entry, numChars, unitWidthPx, columnsPerLine, linesNeeded, hasStrokeOrder, heightPx };
     });
@@ -473,25 +511,30 @@
           unit.className = "unit";
           unit.style.width = unitWidthPx + "px";
 
-          const head = document.createElement("div");
-          head.className = "unit-head";
-          head.style.height = headPx + "px";
-
           const row = document.createElement("div");
           row.className = "unit-row";
 
           entry.chars.forEach((ch, ci) => {
-            const syllSpan = document.createElement("div");
-            syllSpan.className = "syll";
-            syllSpan.style.width = cellPx + "px";
-            syllSpan.style.fontSize = Math.round(cellPx * 0.22) + "px";
-            const lbl = phoneticLabel(entry.pinyins[ci], settings.phonetic);
-            if (lbl.sub) {
-              syllSpan.innerHTML = `${escapeHtml(lbl.main)}<span class="zy" style="font-size:${Math.round(cellPx*0.16)}px">${escapeHtml(lbl.sub)}</span>`;
-            } else {
-              syllSpan.textContent = lbl.main;
+            const col = document.createElement("div");
+            col.className = "char-col";
+            col.style.width = charColWidthPx + "px";
+
+            const pinyinText = entry.pinyins[ci] || "";
+
+            if (showPinyinGrid) {
+              const pyCell = document.createElement("div");
+              pyCell.className = "pinyin-cell";
+              pyCell.style.width = cellPx + "px";
+              pyCell.style.height = pinyinGridPx + "px";
+              pyCell.style.backgroundImage = `url("${pyGridUri}")`;
+              pyCell.style.opacity = String(slot.opacity);
+              pyCell.style.fontSize = Math.round(cellPx * 0.2) + "px";
+              pyCell.textContent = pinyinText;
+              col.appendChild(pyCell);
             }
-            head.appendChild(syllSpan);
+
+            const charZy = document.createElement("div");
+            charZy.className = "char-zhuyin-row";
 
             const cell = document.createElement("div");
             cell.className = "cell";
@@ -499,10 +542,27 @@
             cell.style.height = cellPx + "px";
             cell.style.backgroundImage = `url("${gridUri}")`;
             if (!slot.blank) cell.innerHTML = buildCellSvg(ch, slot.opacity);
-            row.appendChild(cell);
+            charZy.appendChild(cell);
+
+            if (showZhuyinBox) {
+              const zyCell = document.createElement("div");
+              zyCell.className = "zhuyin-cell";
+              zyCell.style.width = zhuyinPx + "px";
+              zyCell.style.height = cellPx + "px";
+              zyCell.style.backgroundImage = `url("${zyBoxUri}")`;
+              zyCell.style.opacity = String(slot.opacity);
+              const zy = document.createElement("span");
+              zy.className = "zy-vert";
+              zy.style.fontSize = Math.round(cellPx * 0.2) + "px";
+              zy.textContent = pinyinText ? Bopomofo.pinyinToZhuyin(pinyinText) : "";
+              zyCell.appendChild(zy);
+              charZy.appendChild(zyCell);
+            }
+
+            col.appendChild(charZy);
+            row.appendChild(col);
           });
 
-          unit.appendChild(head);
           unit.appendChild(row);
           unitWrap.appendChild(unit);
         });
@@ -514,10 +574,6 @@
       pageDiv.appendChild(inner);
       els.pagesContainer.appendChild(pageDiv);
     });
-  }
-
-  function escapeHtml(s) {
-    return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   }
 
   // ---------- PDF export ----------

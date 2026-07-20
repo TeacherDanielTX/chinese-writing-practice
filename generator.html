@@ -86,8 +86,12 @@
           </label>
 
           <label class="field">
-            <span>格子大小 Cell size (mm)</span>
-            <input type="number" id="cellSize" min="12" max="40" step="1" value="20">
+            <span>格子大小 Cell size</span>
+            <select id="cellSize">
+              <option value="15">小 Small (15mm)</option>
+              <option value="20" selected>中 Medium (20mm)</option>
+              <option value="28">大 Large (28mm)</option>
+            </select>
           </label>
 
           <label class="field">

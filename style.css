@@ -296,24 +296,46 @@ textarea#textInput {
   display: flex;
   flex-direction: column;
 }
-.unit-head {
+.unit-row {
   display: flex;
 }
-.unit-head .syll {
+.char-col {
+  display: flex;
+  flex-direction: column;
+}
+.pinyin-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   text-align: center;
   overflow: hidden;
   white-space: nowrap;
   color: var(--accent-dark);
   font-family: Georgia, "Times New Roman", serif;
-  line-height: 1.15;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 100% 100%;
+  box-sizing: border-box;
 }
-.unit-head .syll .zy {
-  display: block;
-  font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
-  color: #888;
-}
-.unit-row {
+.char-zhuyin-row {
   display: flex;
+}
+.zhuyin-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 100% 100%;
+  box-sizing: border-box;
+}
+.zhuyin-cell .zy-vert {
+  writing-mode: vertical-rl;
+  text-orientation: upright;
+  font-family: "Segoe UI", "Microsoft YaHei", sans-serif;
+  color: var(--accent-dark);
+  letter-spacing: 1px;
+  line-height: 1;
 }
 .cell {
   position: relative;

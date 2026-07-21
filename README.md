@@ -22,6 +22,16 @@ An internet connection is required the first time each character is used,
 since stroke-order path data is fetched on demand from the `hanzi-writer-data`
 CDN (jsdelivr).
 
+## Deploying updates
+
+`app.js`, `style.css`, `bopomofo.js`, `showcase.js`, and `landing.css` are
+referenced with a `?v=N` cache-busting query string from `generator.html` and
+`index.html`. GitHub Pages serves these with long cache lifetimes, so without
+a version bump, browsers (including your own, mid-testing) can keep running a
+stale cached copy of the JS/CSS even after a fresh deploy — the page looks
+unchanged even though the server has the new file. **Bump every `?v=N` by one
+whenever you push a change to any of those files.**
+
 ## How to use it
 
 1. Type one word/phrase per line (or separate several with spaces/punctuation

@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>中文写字练习 Chinese Handwriting Practice</title>
-<link rel="stylesheet" href="style.css?v=3">
+<link rel="stylesheet" href="style.css?v=4">
 </head>
 <body>
 <div class="app">
@@ -133,6 +133,33 @@
       </section>
 
       <section class="card">
+        <h2>4. 页眉 / 页脚 Header &amp; footer</h2>
+        <div class="settings-grid">
+
+          <label class="field wide">
+            <span>页眉标题 Header title (optional)</span>
+            <input type="text" id="headerTitle" placeholder="例如：Brooks Writing Homework">
+          </label>
+
+          <label class="field checkbox">
+            <input type="checkbox" id="showNameDate" checked>
+            <span>显示姓名/日期栏 Show Name/Date line</span>
+          </label>
+
+          <label class="field checkbox">
+            <input type="checkbox" id="showPageNum">
+            <span>显示页码 Show page numbers</span>
+          </label>
+
+          <label class="field wide">
+            <span>页脚文字 Footer text (optional)</span>
+            <input type="text" id="footerText" placeholder="例如：老师：王老师">
+          </label>
+
+        </div>
+      </section>
+
+      <section class="card">
         <button id="generatePdfBtn" class="btn primary big">生成 PDF 下载 Generate &amp; Download PDF</button>
         <p id="statusMsg" class="hint status"></p>
       </section>
@@ -160,7 +187,7 @@
 <script src="vendor/hanzi-writer.min.js"></script>
 <script src="vendor/html2canvas.min.js"></script>
 <script src="vendor/jspdf.umd.min.js"></script>
-<script src="bopomofo.js?v=3"></script>
-<script src="app.js?v=3"></script>
+<script src="bopomofo.js?v=4"></script>
+<script src="app.js?v=4"></script>
 </body>
 </html>

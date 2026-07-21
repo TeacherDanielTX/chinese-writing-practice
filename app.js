@@ -14,6 +14,11 @@
   const STROKE_MM = 9;    // stroke-order strip height
   const LINE_GAP_MM = 2.5;
   const ENTRY_GAP_MM = 5;
+  const HEADER_TITLE_MM = 7;   // header title line height, when shown
+  const HEADER_ND_MM = 6;      // name/date line height, when shown
+  const HEADER_GAP_MM = 4;     // gap between header and the page content below it
+  const FOOTER_MM = 6;         // footer strip height, when shown
+  const FOOTER_GAP_MM = 3;     // gap between page content and the footer above it
   const BASE = 100;       // fixed internal coordinate space for cached char svg paths
   const CHAR_RE_RUN = /[㐀-䶿一-鿿豈-﫿]+/g;
 
@@ -40,6 +45,10 @@
     repBlank: document.getElementById("repBlank"),
     showMeaning: document.getElementById("showMeaning"),
     showStrokeOrder: document.getElementById("showStrokeOrder"),
+    headerTitle: document.getElementById("headerTitle"),
+    showNameDate: document.getElementById("showNameDate"),
+    showPageNum: document.getElementById("showPageNum"),
+    footerText: document.getElementById("footerText"),
     generateBtn: document.getElementById("generatePdfBtn"),
     statusMsg: document.getElementById("statusMsg"),
     pagesContainer: document.getElementById("pagesContainer"),
@@ -71,6 +80,10 @@
       repBlank: clampNum(els.repBlank.value, 0, 16, 0),
       showMeaning: els.showMeaning.checked,
       showStrokeOrder: els.showStrokeOrder.checked,
+      headerTitle: els.headerTitle.value.trim(),
+      showNameDate: els.showNameDate.checked,
+      showPageNum: els.showPageNum.checked,
+      footerText: els.footerText.value.trim(),
     };
   }
 
@@ -411,9 +424,16 @@
     const pageHpx = page.h * MM_PX;
     const marginPx = MARGIN_MM * MM_PX;
     const contentWmm = page.w - 2 * MARGIN_MM;
-    const contentHmm = page.h - 2 * MARGIN_MM;
     const contentWpx = contentWmm * MM_PX;
-    const contentHpx = contentHmm * MM_PX;
+
+    const hasHeader = !!settings.headerTitle || settings.showNameDate;
+    const hasFooter = !!settings.footerText || settings.showPageNum;
+    const headerPx = hasHeader
+      ? ((settings.headerTitle ? HEADER_TITLE_MM * MM_PX : 0) + (settings.showNameDate ? HEADER_ND_MM * MM_PX : 0) + HEADER_GAP_MM * MM_PX)
+      : 0;
+    const footerPx = hasFooter ? (FOOTER_MM * MM_PX + FOOTER_GAP_MM * MM_PX) : 0;
+    const contentTopPx = marginPx + headerPx;
+    const contentHpx = pageHpx - contentTopPx - marginPx - footerPx;
     const cellMM = settings.cellSizeMM;
     const cellPx = cellMM * MM_PX;
     const showPinyinGrid = settings.phonetic === "pinyin" || settings.phonetic === "both";
@@ -461,16 +481,70 @@
 
     els.pagesContainer.innerHTML = "";
 
-    pages.forEach((pageLayouts) => {
+    pages.forEach((pageLayouts, pageIndex) => {
       const pageDiv = document.createElement("div");
       pageDiv.className = "pdf-page";
       pageDiv.style.width = pageWpx + "px";
       pageDiv.style.height = pageHpx + "px";
 
+      if (hasHeader) {
+        const header = document.createElement("div");
+        header.className = "page-header";
+        header.style.left = marginPx + "px";
+        header.style.top = marginPx + "px";
+        header.style.width = contentWpx + "px";
+        header.style.height = (headerPx - HEADER_GAP_MM * MM_PX) + "px";
+
+        if (settings.headerTitle) {
+          const title = document.createElement("div");
+          title.className = "page-header-title";
+          title.style.fontSize = Math.round(HEADER_TITLE_MM * MM_PX * 0.62) + "px";
+          title.textContent = settings.headerTitle;
+          header.appendChild(title);
+        }
+        if (settings.showNameDate) {
+          const nd = document.createElement("div");
+          nd.className = "page-namedate";
+          nd.style.fontSize = Math.round(HEADER_ND_MM * MM_PX * 0.5) + "px";
+          ["姓名 Name", "日期 Date"].forEach((label) => {
+            const item = document.createElement("div");
+            item.className = "nd-item";
+            const span = document.createElement("span");
+            span.textContent = label + "：";
+            const blank = document.createElement("span");
+            blank.className = "nd-blank";
+            item.appendChild(span);
+            item.appendChild(blank);
+            nd.appendChild(item);
+          });
+          header.appendChild(nd);
+        }
+        pageDiv.appendChild(header);
+      }
+
+      if (hasFooter) {
+        const footer = document.createElement("div");
+        footer.className = "page-footer";
+        footer.style.left = marginPx + "px";
+        footer.style.top = (pageHpx - marginPx - FOOTER_MM * MM_PX) + "px";
+        footer.style.width = contentWpx + "px";
+        footer.style.height = (FOOTER_MM * MM_PX) + "px";
+        footer.style.fontSize = Math.round(FOOTER_MM * MM_PX * 0.5) + "px";
+        footer.style.paddingTop = Math.round(FOOTER_GAP_MM * MM_PX * 0.4) + "px";
+
+        const left = document.createElement("span");
+        left.textContent = settings.footerText || "";
+        const right = document.createElement("span");
+        right.textContent = settings.showPageNum ? `第 ${pageIndex + 1} / ${pages.length} 页  Page ${pageIndex + 1} of ${pages.length}` : "";
+        footer.appendChild(left);
+        footer.appendChild(right);
+        pageDiv.appendChild(footer);
+      }
+
       const inner = document.createElement("div");
       inner.className = "page-inner";
       inner.style.left = marginPx + "px";
-      inner.style.top = marginPx + "px";
+      inner.style.top = contentTopPx + "px";
       inner.style.width = contentWpx + "px";
       inner.style.height = contentHpx + "px";
       inner.style.gap = entryGapPx + "px";
@@ -662,7 +736,7 @@
     scheduleRender();
   });
 
-  [els.phoneticMode, els.pageSize, els.gridStyle, els.cellSize, els.traceStyle, els.repModel, els.repTrace, els.repBlank, els.showMeaning, els.showStrokeOrder]
+  [els.phoneticMode, els.pageSize, els.gridStyle, els.cellSize, els.traceStyle, els.repModel, els.repTrace, els.repBlank, els.showMeaning, els.showStrokeOrder, els.headerTitle, els.showNameDate, els.showPageNum, els.footerText]
     .forEach((el) => el.addEventListener("input", scheduleRender));
 
   renderTable();

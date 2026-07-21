@@ -202,13 +202,16 @@ textarea#textInput {
   font-size: 12px;
   color: var(--muted);
 }
-.field select, .field input[type="number"] {
+.field select, .field input[type="number"], .field input[type="text"] {
   font-family: inherit;
   font-size: 13px;
   padding: 5px 6px;
   border: 1px solid var(--border);
   border-radius: 5px;
   color: var(--ink);
+}
+.field.wide {
+  grid-column: 1 / -1;
 }
 .field.checkbox {
   flex-direction: row;
@@ -245,6 +248,45 @@ textarea#textInput {
   position: absolute;
   display: flex;
   flex-direction: column;
+}
+
+.page-header {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+}
+.page-header-title {
+  font-weight: 700;
+  text-align: center;
+  color: var(--ink);
+}
+.page-namedate {
+  display: flex;
+  gap: 24px;
+}
+.page-namedate .nd-item {
+  flex: 1;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  white-space: nowrap;
+  color: var(--muted);
+}
+.page-namedate .nd-blank {
+  flex: 1;
+  border-bottom: 1px solid #999;
+  height: 1px;
+}
+
+.page-footer {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--muted);
+  border-top: 1px solid var(--border);
 }
 
 .entry-block {

@@ -254,10 +254,19 @@
   // Chinese pinyin is taught to be written: a shorter top band (ascenders/tone
   // marks), a taller middle band (main letter body), and a shorter bottom
   // band (descenders).
+  // The viewBox width stays on the SAME 100-units-per-cellPx convention as
+  // the character grid box (pinyin box width always equals cellPx), so the
+  // border strokes render at matching, correctly-proportioned thickness at
+  // any cell size. heightFactor = pinyinGridPx / cellPx sets the viewBox
+  // height so the aspect ratio always matches the box's real shape —
+  // otherwise background-size:100% 100% distorts the border into a
+  // near-invisible hairline (this was the actual bug).
   let pinyinGridUriCache = null;
-  function pinyinGridUri() {
-    if (pinyinGridUriCache) return pinyinGridUriCache;
-    const w = 100, h = 44;
+  let pinyinGridUriCacheFactor = null;
+  function pinyinGridUri(heightFactor) {
+    if (pinyinGridUriCache && pinyinGridUriCacheFactor === heightFactor) return pinyinGridUriCache;
+    const w = 100;
+    const h = w * heightFactor;
     const border = "#9b9182";
     const guide = "#c9c0b0";
     const y2 = h * 0.32;
@@ -269,6 +278,7 @@
       `<line x1="0" y1="${y3}" x2="${w}" y2="${y3}" stroke="${guide}" stroke-width="1" stroke-dasharray="4,3"/>` +
       `</svg>`;
     pinyinGridUriCache = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svg)));
+    pinyinGridUriCacheFactor = heightFactor;
     return pinyinGridUriCache;
   }
 
@@ -415,7 +425,7 @@
 
     const slots = buildSlots(settings);
     const gridUri = gridBackgroundUri(settings.gridStyle);
-    const pyGridUri = pinyinGridUri();
+    const pyGridUri = pinyinGridUri(pinyinGridPx / cellPx);
     const zyBoxUri = zhuyinBoxUri(ZHUYIN_WIDTH_FACTOR);
 
     // pre-compute per-entry layout metrics
@@ -537,9 +547,18 @@
               pyCell.style.width = cellPx + "px";
               pyCell.style.height = pinyinGridPx + "px";
               pyCell.style.backgroundImage = `url("${pyGridUri}")`;
-              pyCell.style.opacity = String(slot.opacity);
-              pyCell.style.fontSize = Math.round(cellPx * 0.2) + "px";
-              pyCell.textContent = pinyinText;
+              // Sit the text on the ruled "line 3" baseline (68% down) instead
+              // of dead-centering it, so tone marks rise into the top band
+              // like real four-line pinyin practice paper.
+              pyCell.style.paddingBottom = Math.round(pinyinGridPx * 0.3) + "px";
+              // Opacity goes on the text only, not the cell itself — the ruled
+              // grid should stay fully visible on every repetition, exactly
+              // like the character cell's grid never fades.
+              const pyText = document.createElement("span");
+              pyText.style.opacity = String(slot.opacity);
+              pyText.style.fontSize = Math.round(cellPx * 0.2) + "px";
+              pyText.textContent = pinyinText;
+              pyCell.appendChild(pyText);
               col.appendChild(pyCell);
             }
 
@@ -560,9 +579,10 @@
               zyCell.style.width = zhuyinPx + "px";
               zyCell.style.height = cellPx + "px";
               zyCell.style.backgroundImage = `url("${zyBoxUri}")`;
-              zyCell.style.opacity = String(slot.opacity);
+              // Opacity goes on the text only — the box stays fully visible.
               const zy = document.createElement("span");
               zy.className = "zy-vert";
+              zy.style.opacity = String(slot.opacity);
               zy.style.fontSize = Math.round(cellPx * 0.2) + "px";
               zy.textContent = pinyinText ? Bopomofo.pinyinToZhuyin(pinyinText) : "";
               zyCell.appendChild(zy);

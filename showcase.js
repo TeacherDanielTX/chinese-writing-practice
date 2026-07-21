@@ -32,8 +32,9 @@
     return "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svg)));
   }
 
-  function pinyinGridUri() {
-    const w = 100, h = 44;
+  function pinyinGridUri(heightFactor) {
+    const w = 100;
+    const h = w * heightFactor;
     const border = "#9b9182";
     const guide = "#c9c0b0";
     const y2 = h * 0.32, y3 = h * 0.68;
@@ -98,11 +99,11 @@
   function buildWordRow(container, chars, pinyins, opts) {
     const { reps = 3, gridStyle = "tian", phonetic = "pinyin" } = opts || {};
     const gridUri = gridBackgroundUri(gridStyle);
-    const pyGridUri = pinyinGridUri();
-    const zyBoxUri = zhuyinBoxUri(1 / 3);
     const showPinyinGrid = phonetic === "pinyin" || phonetic === "both";
     const showZhuyinBox = phonetic === "zhuyin" || phonetic === "both";
     const pinyinGridPx = 26;
+    const pyGridUri = pinyinGridUri(pinyinGridPx / CELL_PX);
+    const zyBoxUri = zhuyinBoxUri(1 / 3);
     const zhuyinPx = CELL_PX / 3; // 1/3 the character cell's width, same height as the cell
     const charColWidthPx = CELL_PX + (showZhuyinBox ? zhuyinPx : 0);
 
@@ -129,9 +130,12 @@
           pyCell.style.width = CELL_PX + "px";
           pyCell.style.height = pinyinGridPx + "px";
           pyCell.style.backgroundImage = `url("${pyGridUri}")`;
-          pyCell.style.opacity = opacity;
-          pyCell.style.fontSize = "12px";
-          pyCell.textContent = py;
+          pyCell.style.paddingBottom = Math.round(pinyinGridPx * 0.3) + "px";
+          const pyText = document.createElement("span");
+          pyText.style.opacity = opacity;
+          pyText.style.fontSize = "12px";
+          pyText.textContent = py;
+          pyCell.appendChild(pyText);
           col.appendChild(pyCell);
         }
 
@@ -152,9 +156,9 @@
           zyCell.style.width = zhuyinPx + "px";
           zyCell.style.height = CELL_PX + "px";
           zyCell.style.backgroundImage = `url("${zyBoxUri}")`;
-          zyCell.style.opacity = opacity;
           const zy = document.createElement("span");
           zy.className = "zy-vert";
+          zy.style.opacity = opacity;
           zy.style.fontSize = Math.round(CELL_PX * 0.2) + "px";
           zy.textContent = Bopomofo.pinyinToZhuyin(py);
           zyCell.appendChild(zy);

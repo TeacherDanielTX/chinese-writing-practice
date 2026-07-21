@@ -453,35 +453,118 @@
     const pyGridUri = pinyinGridUri(pinyinGridPx / cellPx);
     const zyBoxUri = zhuyinBoxUri(ZHUYIN_WIDTH_FACTOR);
 
-    // pre-compute per-entry layout metrics
-    const layouts = entries.map((entry) => {
+    // Build a flat sequence of chunks (label / stroke-order / one repetition
+    // row each) across all entries. Pagination splits at chunk boundaries,
+    // not entry boundaries, so a word with many repetitions correctly spills
+    // its extra rows onto additional pages instead of being clipped by a
+    // single page's fixed height.
+    const chunks = [];
+    entries.forEach((entry) => {
       const numChars = entry.chars.length;
       const unitWidthPx = numChars * charColWidthPx;
       const columnsPerLine = Math.max(1, Math.floor(contentWpx / unitWidthPx));
       const linesNeeded = Math.max(1, Math.ceil(slots.length / columnsPerLine));
       const hasStrokeOrder = settings.showStrokeOrder && numChars === 1 && strokeCache.get(entry.chars[0]);
-      let heightPx = settings.showMeaning ? labelPx + labelGapPx : 0;
-      if (hasStrokeOrder) heightPx += strokePx;
-      heightPx += linesNeeded * lineHeightPx + (linesNeeded - 1) * lineGapPx;
-      heightPx += entryGapPx;
-      return { entry, numChars, unitWidthPx, columnsPerLine, linesNeeded, hasStrokeOrder, heightPx };
+      const entryMeta = { entry, numChars, unitWidthPx, columnsPerLine };
+
+      if (settings.showMeaning) {
+        chunks.push({ kind: "label", entryMeta, contentHeightPx: labelPx, gapAfterPx: labelGapPx, heightPx: labelPx + labelGapPx });
+      }
+      if (hasStrokeOrder) {
+        chunks.push({ kind: "strokeOrder", entryMeta, contentHeightPx: strokePx, gapAfterPx: 0, heightPx: strokePx });
+      }
+      for (let li = 0; li < linesNeeded; li++) {
+        const lineSlots = slots.slice(li * columnsPerLine, (li + 1) * columnsPerLine);
+        const isLastLine = li === linesNeeded - 1;
+        const gapAfterPx = isLastLine ? entryGapPx : lineGapPx;
+        chunks.push({ kind: "line", entryMeta, lineSlots, contentHeightPx: lineHeightPx, gapAfterPx, heightPx: lineHeightPx + gapAfterPx });
+      }
     });
 
-    // bucket into pages
+    // bucket chunks into pages
     const pages = [[]];
     let curHeight = 0;
-    layouts.forEach((layout) => {
-      if (curHeight + layout.heightPx > contentHpx && pages[pages.length - 1].length > 0) {
+    chunks.forEach((chunk) => {
+      if (curHeight + chunk.heightPx > contentHpx && pages[pages.length - 1].length > 0) {
         pages.push([]);
         curHeight = 0;
       }
-      pages[pages.length - 1].push(layout);
-      curHeight += layout.heightPx;
+      pages[pages.length - 1].push(chunk);
+      curHeight += chunk.heightPx;
     });
+
+    // Builds one repetition column (a character, its optional pinyin box
+    // above, and optional bopomofo box to the right) for a single slot.
+    function buildUnitEl(entry, unitWidthPx, slot) {
+      const unit = document.createElement("div");
+      unit.className = "unit";
+      unit.style.width = unitWidthPx + "px";
+
+      const row = document.createElement("div");
+      row.className = "unit-row";
+
+      entry.chars.forEach((ch, ci) => {
+        const col = document.createElement("div");
+        col.className = "char-col";
+        col.style.width = charColWidthPx + "px";
+
+        const pinyinText = entry.pinyins[ci] || "";
+
+        if (showPinyinGrid) {
+          const pyCell = document.createElement("div");
+          pyCell.className = "pinyin-cell";
+          pyCell.style.width = cellPx + "px";
+          pyCell.style.height = pinyinGridPx + "px";
+          pyCell.style.backgroundImage = `url("${pyGridUri}")`;
+          // Opacity goes on the text only, not the cell itself — the ruled
+          // grid should stay fully visible on every repetition, exactly
+          // like the character cell's grid never fades.
+          const pyText = document.createElement("span");
+          pyText.style.opacity = String(slot.opacity);
+          pyText.style.fontSize = Math.round(cellPx * 0.2) + "px";
+          pyText.textContent = pinyinText;
+          pyCell.appendChild(pyText);
+          col.appendChild(pyCell);
+        }
+
+        const charZy = document.createElement("div");
+        charZy.className = "char-zhuyin-row";
+
+        const cell = document.createElement("div");
+        cell.className = "cell";
+        cell.style.width = cellPx + "px";
+        cell.style.height = cellPx + "px";
+        cell.style.backgroundImage = `url("${gridUri}")`;
+        if (!slot.blank) cell.innerHTML = buildCellSvg(ch, slot.opacity);
+        charZy.appendChild(cell);
+
+        if (showZhuyinBox) {
+          const zyCell = document.createElement("div");
+          zyCell.className = "zhuyin-cell";
+          zyCell.style.width = zhuyinPx + "px";
+          zyCell.style.height = cellPx + "px";
+          zyCell.style.backgroundImage = `url("${zyBoxUri}")`;
+          // Opacity goes on the text only — the box stays fully visible.
+          const zy = document.createElement("span");
+          zy.className = "zy-vert";
+          zy.style.opacity = String(slot.opacity);
+          zy.style.fontSize = Math.round(cellPx * 0.2) + "px";
+          zy.textContent = pinyinText ? Bopomofo.pinyinToZhuyin(pinyinText) : "";
+          zyCell.appendChild(zy);
+          charZy.appendChild(zyCell);
+        }
+
+        col.appendChild(charZy);
+        row.appendChild(col);
+      });
+
+      unit.appendChild(row);
+      return unit;
+    }
 
     els.pagesContainer.innerHTML = "";
 
-    pages.forEach((pageLayouts, pageIndex) => {
+    pages.forEach((pageChunks, pageIndex) => {
       const pageDiv = document.createElement("div");
       pageDiv.className = "pdf-page";
       pageDiv.style.width = pageWpx + "px";
@@ -547,18 +630,27 @@
       inner.style.top = contentTopPx + "px";
       inner.style.width = contentWpx + "px";
       inner.style.height = contentHpx + "px";
-      inner.style.gap = entryGapPx + "px";
+      // No gap here — spacing between lines/entries is handled per-chunk via
+      // gapAfterPx margins, since an entry's lines may now be split across
+      // page boundaries.
 
-      pageLayouts.forEach((layout) => {
-        const { entry, numChars, unitWidthPx, columnsPerLine } = layout;
-        const block = document.createElement("div");
-        block.className = "entry-block";
+      let currentBlock = null;
+      let currentEntryMeta = null;
 
-        if (settings.showMeaning) {
+      pageChunks.forEach((chunk) => {
+        if (chunk.entryMeta !== currentEntryMeta) {
+          currentBlock = document.createElement("div");
+          currentBlock.className = "entry-block";
+          inner.appendChild(currentBlock);
+          currentEntryMeta = chunk.entryMeta;
+        }
+        const { entry, unitWidthPx, columnsPerLine } = chunk.entryMeta;
+
+        if (chunk.kind === "label") {
           const label = document.createElement("div");
           label.className = "entry-label";
-          label.style.height = labelPx + "px";
-          label.style.marginBottom = labelGapPx + "px";
+          label.style.height = chunk.contentHeightPx + "px";
+          label.style.marginBottom = chunk.gapAfterPx + "px";
           label.style.fontSize = Math.round(cellPx * 0.2) + "px";
           const word = document.createElement("span");
           word.className = "word";
@@ -571,16 +663,15 @@
             meaning.textContent = entry.meaning;
             label.appendChild(meaning);
           }
-          block.appendChild(label);
-        }
-
-        if (layout.hasStrokeOrder) {
+          currentBlock.appendChild(label);
+        } else if (chunk.kind === "strokeOrder") {
           const glyphs = buildStrokeOrderGlyphs(entry.chars[0]);
           if (glyphs.length) {
             const row = document.createElement("div");
             row.className = "stroke-order-row";
-            row.style.height = strokePx + "px";
+            row.style.height = chunk.contentHeightPx + "px";
             row.style.gap = "3px";
+            row.style.marginBottom = chunk.gapAfterPx + "px";
             const glyphSize = Math.min(cellPx * 0.42, 30);
             glyphs.forEach((svg, gi) => {
               const g = document.createElement("div");
@@ -597,84 +688,18 @@
                 row.appendChild(arrow);
               }
             });
-            block.appendChild(row);
+            currentBlock.appendChild(row);
           }
-        }
-
-        const unitWrap = document.createElement("div");
-        unitWrap.className = "unit-wrap";
-        unitWrap.style.width = (columnsPerLine * unitWidthPx) + "px";
-        unitWrap.style.gap = lineGapPx + "px";
-
-        slots.forEach((slot) => {
-          const unit = document.createElement("div");
-          unit.className = "unit";
-          unit.style.width = unitWidthPx + "px";
-
-          const row = document.createElement("div");
-          row.className = "unit-row";
-
-          entry.chars.forEach((ch, ci) => {
-            const col = document.createElement("div");
-            col.className = "char-col";
-            col.style.width = charColWidthPx + "px";
-
-            const pinyinText = entry.pinyins[ci] || "";
-
-            if (showPinyinGrid) {
-              const pyCell = document.createElement("div");
-              pyCell.className = "pinyin-cell";
-              pyCell.style.width = cellPx + "px";
-              pyCell.style.height = pinyinGridPx + "px";
-              pyCell.style.backgroundImage = `url("${pyGridUri}")`;
-              // Opacity goes on the text only, not the cell itself — the ruled
-              // grid should stay fully visible on every repetition, exactly
-              // like the character cell's grid never fades.
-              const pyText = document.createElement("span");
-              pyText.style.opacity = String(slot.opacity);
-              pyText.style.fontSize = Math.round(cellPx * 0.2) + "px";
-              pyText.textContent = pinyinText;
-              pyCell.appendChild(pyText);
-              col.appendChild(pyCell);
-            }
-
-            const charZy = document.createElement("div");
-            charZy.className = "char-zhuyin-row";
-
-            const cell = document.createElement("div");
-            cell.className = "cell";
-            cell.style.width = cellPx + "px";
-            cell.style.height = cellPx + "px";
-            cell.style.backgroundImage = `url("${gridUri}")`;
-            if (!slot.blank) cell.innerHTML = buildCellSvg(ch, slot.opacity);
-            charZy.appendChild(cell);
-
-            if (showZhuyinBox) {
-              const zyCell = document.createElement("div");
-              zyCell.className = "zhuyin-cell";
-              zyCell.style.width = zhuyinPx + "px";
-              zyCell.style.height = cellPx + "px";
-              zyCell.style.backgroundImage = `url("${zyBoxUri}")`;
-              // Opacity goes on the text only — the box stays fully visible.
-              const zy = document.createElement("span");
-              zy.className = "zy-vert";
-              zy.style.opacity = String(slot.opacity);
-              zy.style.fontSize = Math.round(cellPx * 0.2) + "px";
-              zy.textContent = pinyinText ? Bopomofo.pinyinToZhuyin(pinyinText) : "";
-              zyCell.appendChild(zy);
-              charZy.appendChild(zyCell);
-            }
-
-            col.appendChild(charZy);
-            row.appendChild(col);
+        } else if (chunk.kind === "line") {
+          const unitWrap = document.createElement("div");
+          unitWrap.className = "unit-wrap";
+          unitWrap.style.width = (columnsPerLine * unitWidthPx) + "px";
+          unitWrap.style.marginBottom = chunk.gapAfterPx + "px";
+          chunk.lineSlots.forEach((slot) => {
+            unitWrap.appendChild(buildUnitEl(entry, unitWidthPx, slot));
           });
-
-          unit.appendChild(row);
-          unitWrap.appendChild(unit);
-        });
-
-        block.appendChild(unitWrap);
-        inner.appendChild(block);
+          currentBlock.appendChild(unitWrap);
+        }
       });
 
       pageDiv.appendChild(inner);

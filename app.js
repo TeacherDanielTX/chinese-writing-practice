@@ -10,6 +10,7 @@
   const PINYIN_GRID_MM = 8;    // ruled four-line pinyin box height, above the character
   const ZHUYIN_WIDTH_FACTOR = 1 / 3; // zhuyin box width, as a fraction of the character cell (height matches the character cell)
   const LABEL_MM = 6.5;   // entry word+meaning label height
+  const LABEL_GAP_MM = 2; // breathing room between the label and the grid below it
   const STROKE_MM = 9;    // stroke-order strip height
   const LINE_GAP_MM = 2.5;
   const ENTRY_GAP_MM = 5;
@@ -52,6 +53,9 @@
     dict = d;
     s2t = s2tData;
     t2s = t2sData;
+    // Populate from any default/pre-filled textarea content (e.g. the sample
+    // words shipped in the page) now that dictionary lookups will work.
+    syncEntriesFromTextarea();
   });
 
   function getSettings() {
@@ -419,6 +423,7 @@
     const charColWidthPx = cellPx + (showZhuyinBox ? zhuyinPx : 0);
     const lineHeightPx = (showPinyinGrid ? pinyinGridPx : 0) + cellPx;
     const labelPx = LABEL_MM * MM_PX;
+    const labelGapPx = LABEL_GAP_MM * MM_PX;
     const strokePx = STROKE_MM * MM_PX;
     const lineGapPx = LINE_GAP_MM * MM_PX;
     const entryGapPx = ENTRY_GAP_MM * MM_PX;
@@ -435,7 +440,7 @@
       const columnsPerLine = Math.max(1, Math.floor(contentWpx / unitWidthPx));
       const linesNeeded = Math.max(1, Math.ceil(slots.length / columnsPerLine));
       const hasStrokeOrder = settings.showStrokeOrder && numChars === 1 && strokeCache.get(entry.chars[0]);
-      let heightPx = settings.showMeaning ? labelPx : 0;
+      let heightPx = settings.showMeaning ? labelPx + labelGapPx : 0;
       if (hasStrokeOrder) heightPx += strokePx;
       heightPx += linesNeeded * lineHeightPx + (linesNeeded - 1) * lineGapPx;
       heightPx += entryGapPx;
@@ -479,6 +484,7 @@
           const label = document.createElement("div");
           label.className = "entry-label";
           label.style.height = labelPx + "px";
+          label.style.marginBottom = labelGapPx + "px";
           label.style.fontSize = Math.round(cellPx * 0.2) + "px";
           const word = document.createElement("span");
           word.className = "word";
@@ -547,10 +553,6 @@
               pyCell.style.width = cellPx + "px";
               pyCell.style.height = pinyinGridPx + "px";
               pyCell.style.backgroundImage = `url("${pyGridUri}")`;
-              // Sit the text on the ruled "line 3" baseline (68% down) instead
-              // of dead-centering it, so tone marks rise into the top band
-              // like real four-line pinyin practice paper.
-              pyCell.style.paddingBottom = Math.round(pinyinGridPx * 0.3) + "px";
               // Opacity goes on the text only, not the cell itself — the ruled
               // grid should stay fully visible on every repetition, exactly
               // like the character cell's grid never fades.

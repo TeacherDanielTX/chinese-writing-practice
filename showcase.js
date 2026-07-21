@@ -130,7 +130,6 @@
           pyCell.style.width = CELL_PX + "px";
           pyCell.style.height = pinyinGridPx + "px";
           pyCell.style.backgroundImage = `url("${pyGridUri}")`;
-          pyCell.style.paddingBottom = Math.round(pinyinGridPx * 0.3) + "px";
           const pyText = document.createElement("span");
           pyText.style.opacity = opacity;
           pyText.style.fontSize = "12px";
